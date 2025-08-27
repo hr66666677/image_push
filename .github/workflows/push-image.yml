@@ -1,0 +1,38 @@
+name: Push Docker Image to GitHub Packages
+
+on:
+  push:
+    branches: [ main ]  # 当推送到 main 分支时触发
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 拉取仓库代码
+        uses: actions/checkout@v4
+
+      - name: 加载 Docker 环境
+        uses: docker/setup-buildx-action@v3
+
+      - name: 登录 GitHub Packages
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}  # 自动获取当前 GitHub 用户名
+          password: ${{ secrets.GITHUB_TOKEN }}  # GitHub 自动生成的令牌，无需手动创建
+
+      - name: 推送本地镜像（如果用了 tar 文件）
+        if: exists('my-image.tar')  # 检查是否有 tar 文件
+        run: |
+          docker load -i my-image.tar
+          # 给镜像打标签（格式：ghcr.io/用户名/仓库名:标签）
+          docker tag 本地镜像名称:标签 ghcr.io/${{ github.repository_owner }}/my-image:latest
+          docker push ghcr.io/${{ github.repository_owner }}/my-image:latest
+
+      - name: 从 Dockerfile 构建并推送（如果用 Dockerfile）
+        if: exists('Dockerfile')  # 检查是否有 Dockerfile
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: ghcr.io/${{ github.repository_owner }}/my-image:latest
